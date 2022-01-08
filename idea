@@ -1,0 +1,11 @@
+I wanted to get my idea out for posterity (and before I forget it). The steps could be something like:
+
+1. Simplify input equations such that no literals (`false` or `true`) are present, or such that a side reduces to just `false` or `true`. Basically, if there are variables present on one side, then that side should no longer also contain `false` or `true` literals.
+2. If one side is still a literal, do successive variable elimination on the other.
+3. Otherwise, proceed with Boolean syntactic unification:
+    1. Both sides syntactically equal ==> empty substitution
+    2. One side is variable ==> singleton substitution
+    3. Both sides are `&&` or both are `||` ==> recurse and compose
+    4. Both sides are `¬` ==> recurse
+    5. One side is `¬`, other is binary ==> recurse on the de Morgan's rewritten negation of the other side (`&&` becomes `||` ==> recurse, `||` becomes `&&` ==> recurse)
+    6. One side is `&&`, other is `||` ==> rewrite one side using Boolean equivalences so that both are the same operator, then recurse and compose
