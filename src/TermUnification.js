@@ -14,14 +14,14 @@
  *  limitations under the License.
  */
 import {isBool, minBool, showBool} from "./Bools";
-import {boolUnify} from "./BoolUnification";
+import {boolSyntacticUnify, boolUnify} from "./BoolUnification";
 import {applySubst, mergeSubst} from "./Substitution";
 import {isConstructor, mkConstructor, showTerm} from "./Terms";
 
 /**
  * Returns a substitution that unifies x and y (if it exists).
  */
-export function unifyTerm(t1, t2) {
+export function unifyTerm(t1, t2, useSyntacticBool = false) {
     if (t1 === undefined) {
         throw new Error(`Illegal argument 't1': ${t1}.`)
     }
@@ -30,10 +30,10 @@ export function unifyTerm(t1, t2) {
     }
 
     if (isBool(t1) && isBool(t2)) {
-        return boolUnify(t1, t2)
+        return useSyntacticBool ? boolSyntacticUnify(t1, t2) : boolUnify(t1, t2)
     } else if (isConstructor(t1) && isConstructor(t2)) {
         if (t1.name === t2.name) {
-            return unifyTermLists(t1.ts, t2.ts)
+            return unifyTermLists(t1.ts, t2.ts, useSyntacticBool)
         } else {
             return {status: "failure", reason: `Mismatched constructors: ${t1.name} and ${t2.name}.`}
         }
@@ -55,7 +55,7 @@ export function unifyTerm(t1, t2) {
 /**
  * Returns a substitution that unifies the two term lists `l1` and `l2`.
  */
-function unifyTermLists(l1, l2) {
+function unifyTermLists(l1, l2, useSyntacticBool = false) {
     if (!Array.isArray(l1)) {
         throw new Error(`Illegal argument l1: ${l1}`)
     }
@@ -76,7 +76,7 @@ function unifyTermLists(l1, l2) {
         let [y, ...ys] = l2
 
         // Unify x and y.
-        let result = unifyTerm(x, y)
+        let result = unifyTerm(x, y, useSyntacticBool)
         if (result.status !== "success") {
             // Failed. Return immediately.
             return result
@@ -89,7 +89,7 @@ function unifyTermLists(l1, l2) {
             let ys1 = ys.map(t => applySubst(subst, t))
 
             // Recursive unify xs1 and ys1.
-            let result1 = unifyTermLists(xs1, ys1)
+            let result1 = unifyTermLists(xs1, ys1, useSyntacticBool)
 
             if (result1.status !== "success") {
                 // Failed. Return.

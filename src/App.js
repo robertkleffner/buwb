@@ -51,7 +51,7 @@ class App extends Component {
         console.log("Solve y = ", y)
 
         // Compute the mgu.
-        let result = unifyTerm(x, y)
+        let result = unifyTerm(x, y, true)
 
         // Check if it exists.
         if (result.status === "success") {

@@ -13,8 +13,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-import {FALSE, boolFreeVars, isBool, isFalse, isTrue, mkAnd, mkNot, mkOr, mkVar, showBool, TRUE, isVar, isAnd, isSyntacticEq, isOr, isNot} from "./Bools.js";
-import {applySubst} from "./Substitution";
+import {FALSE, boolFreeVars, isBool, isFalse, isTrue, mkAnd, mkNot, mkOr, mkVar, showBool, TRUE, isVar, isAnd, isSyntacticEq, isOr, isNot, minBool} from "./Bools.js";
+import {applySubst, mergeSubst} from "./Substitution";
 
 /**
  * Returns a substitution that unifies f1 and f2 (if it exists).
@@ -32,7 +32,7 @@ export function boolUnify(f1, f2) {
     // 2. f1 matches f2 or f2 matches f1
     // This will generate 'simpler' substitutions than SVE,
     // especially when the equations have lots of variables.
-    let f1Free = boolFreeVars(f1);
+    /*let f1Free = boolFreeVars(f1);
     let f2Free = boolFreeVars(f2);
     let freeOverlap = [...f1Free].filter(x => f2Free.includes(x))
     if (freeOverlap.length == 0) {
@@ -44,7 +44,7 @@ export function boolUnify(f1, f2) {
             let subst = syntacticMatch(f2, f1)
             return {status: "success", subst: subst}
         } catch (e) { }
-    }
+    }*/
 
     // The boolean expression we want to show is 0.
     let query = mkOr(mkAnd(f1, mkNot(f2)), mkAnd(mkNot(f1), f2))
@@ -62,6 +62,77 @@ export function boolUnify(f1, f2) {
             throw e
         }
     }
+}
+
+export function boolSyntacticUnify(f1, f2) {
+    if (f1 === undefined || !isBool(f1)) {
+        throw new Error(`Illegal argument 'x': ${f1}.`)
+    }
+    if (f2 === undefined || !isBool(f2)) {
+        throw new Error(`Illegal argument 'y': ${f2}.`)
+    }
+
+    // cheatery way to remove literals from an input equation
+    // because applySubst calls mk* functions which have cases
+    // for stripping out Boolean literals
+    let min1 = applySubst({}, f1)
+    let min2 = applySubst({}, f2)
+
+    // if one side is a literal, just do SVE
+    if (isTrue(min1) || isFalse(min1) || isTrue(min2) || isFalse(min2)) {
+        return boolUnify(min1, min2)
+    }
+
+    try {
+        let subst = syntacticUnifyRec(min1, min2)
+        return {status: "success", subst: subst}
+    } catch (e) {
+        if (e instanceof SyntacticUnifyError) {
+            return {status: "failure", reason: `Cannot unify: ${showBool(min1)} and ${showBool(min2)}`}
+        } else {
+            throw e
+        }
+    }
+}
+
+function syntacticUnifyRec(l, r) {
+    if (isSyntacticEq(l, r)) {
+        return {}
+    } else if (isVar(l)) {
+        return {[l.name]: r}
+    } else if (isVar(r)) {
+        return {[r.name]: l}
+    } else if (isAnd(l) && isAnd(r)) {
+        let subst1 = syntacticUnifyRec(l.f1, r.f1)
+        let subst2 = syntacticUnifyRec(applySubst(subst1, l.f2), applySubst(subst1, r.f2))
+        return mergeSubst(subst2, subst1)
+    } else if (isOr(l) && isOr(r)) {
+        let subst1 = syntacticUnifyRec(l.f1, r.f1)
+        let subst2 = syntacticUnifyRec(applySubst(subst1, l.f2), applySubst(subst1, r.f2))
+        return mergeSubst(subst2, subst1)
+    } else if (isNot(l) && isNot(r)) {
+        return syntacticUnifyRec(l.f, r.f)
+    } else if (isNot(l)) {
+        return syntacticUnifyRec(l.f, deMorganNegation(r))
+    } else if (isNot(r)) {
+        return syntacticUnifyRec(deMorganNegation(l), r.f)
+    } else if (isAnd(l) || isAnd(r)) {
+        // The boolean expression we want to show is 0.
+        let query = mkOr(mkAnd(l, mkNot(r)), mkAnd(mkNot(l), r))
+        // The free variables in the query.
+        let fvs = boolFreeVars(query)
+        return successiveVariableElimination(query, fvs)
+    }
+    throw new Error(`Unhandled case in syntactic Boolean unification: ${l} ~ ${r}`)
+}
+
+function deMorganNegation(eqn) {
+    if (isAnd(eqn)) {
+        return mkOr(mkNot(eqn.f1), mkNot(eqn.f2))
+    } else if (isOr(eqn)) {
+        return mkAnd(mkNot(eqn.f1), mkNot(eqn.f2))
+    }
+    throw new Error(`Attempted to perform de Morgan negation on an unsupported equation: ${eqn}`)
 }
 
 /**
@@ -179,5 +250,12 @@ class SyntacticMatchError extends Error {
     constructor(message) {
         super(message);
         this.name = "Syntactic Match Failure";
+    }
+}
+
+class SyntacticUnifyError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "Syntactic Unify Failure";
     }
 }
