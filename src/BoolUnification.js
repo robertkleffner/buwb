@@ -15,7 +15,7 @@
  */
 
 import {FALSE, boolFreeVars, isBool, isFalse, isTrue, mkAnd, mkNot, mkOr, mkVar, showBool, TRUE, isVar,
-    isAnd, isSyntacticEq, isOr, isNot, minBool, truthTable, minBool, mkXor} from "./Bools.js";
+    isAnd, isSyntacticEq, isOr, isNot, minBool, truthTable, mkXor} from "./Bools.js";
 import {applySubst, mergeSubst} from "./Substitution";
 
 /**
@@ -23,7 +23,8 @@ import {applySubst, mergeSubst} from "./Substitution";
  */
 export const METHOD = Object.freeze({
     SVE: "sve",
-    Lowenheim: "lowenheim"
+    Lowenheim: "lowenheim",
+    Syntactic: "syntactic"
 })
 
 /**
@@ -33,6 +34,7 @@ export function getUnifyMethod(methodName) {
     switch (methodName) {
         case METHOD.SVE: return boolUnify;
         case METHOD.Lowenheim: return lowenheimUnify;
+        case METHOD.Syntactic: return boolSyntacticUnify;
         default: throw new Error(`Invalid Boolean unification method ${methodName}`)
     }
 }
@@ -86,7 +88,8 @@ export function boolSyntacticUnify(f1, f2) {
     }
 
     try {
-        let subst = syntacticUnifyRec(min1, min2)
+        let unifier = syntacticUnifyRec(min1, min2)
+        let subst = mguFromUnifier(unifier, mkXor(min1, min2))
         return {status: "success", subst: subst}
     } catch (e) {
         if (e instanceof SyntacticUnifyError) {

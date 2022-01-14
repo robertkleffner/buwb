@@ -123,6 +123,10 @@ export function mkAnd(f1, f2) {
         return FALSE
     } else if (isSyntacticEq(f1, f2)) {
         return f1
+    } else if (isNot(f2) && !isNot(f1) && isSyntacticEq(f1, f2.f)) {
+        return FALSE
+    } else if (isNot(f1) && !isNot(f2) && isSyntacticEq(f1.f, f2)) {
+        return FALSE
     }
 
     return {type: 'AND', f1: f1, f2: f2}
@@ -145,6 +149,18 @@ export function mkOr(f1, f2) {
         return f1
     } else if (isSyntacticEq(f1, f2)) {
         return f1
+    } else if (isNot(f2) && !isNot(f1) && isSyntacticEq(f1, f2.f)) {
+        return TRUE
+    } else if (isNot(f1) && !isNot(f2) && isSyntacticEq(f2, f1.f)) {
+        return TRUE
+    } else if (isAnd(f2) && isSyntacticEq(f1, f2.f2)) {
+        return f1
+    } else if (isAnd(f2) && isSyntacticEq(f1, f2.f1)) {
+        return f1
+    } else if (isAnd(f1) && isSyntacticEq(f2, f1.f2)) {
+        return f2
+    } else if (isAnd(f1) && isSyntacticEq(f2, f1.f1)) {
+        return f2
     }
 
     return {type: 'OR', f1: f1, f2: f2}
@@ -164,7 +180,7 @@ export function mkXor(f1, f2) {
 /**
  * Returns `true` if the Boolean formulas `f1` and `f2` are *syntactically* equal.
  */
-function isSyntacticEq(f1, f2) {
+export function isSyntacticEq(f1, f2) {
     if (f1 === undefined || !isBool(f1)) throw new Error(`Illegal argument 'f1': ${f1}.`)
     if (f2 === undefined || !isBool(f2)) throw new Error(`Illegal argument 'f2': ${f2}.`)
 
